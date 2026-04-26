@@ -186,21 +186,23 @@ export default function Home() {
                     <span>{response.latency_ms}ms</span>
                   </div>
                   
-                  <div className="relative bg-card border border-border rounded-xl p-6 shadow-sm font-mono text-sm overflow-x-auto group">
+                  <div className="relative bg-card border border-border rounded-xl shadow-sm group">
                     <button
                       onClick={handleCopy}
-                      className="absolute top-4 right-4 p-2 rounded-md bg-transparent hover:bg-muted/10 text-muted hover:text-foreground transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      className="absolute top-4 right-4 p-2 rounded-md bg-card/80 backdrop-blur-sm hover:bg-muted/20 text-muted hover:text-foreground transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
                       title="Copy SQL"
                     >
                       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
-                    <SyntaxHighlighter
-                      language="sql"
-                      style={minimalTheme}
-                      customStyle={{ background: 'transparent', padding: 0 }}
-                    >
-                      {response.sql}
-                    </SyntaxHighlighter>
+                    <div className="p-6 font-mono text-sm overflow-x-auto">
+                      <SyntaxHighlighter
+                        language="sql"
+                        style={minimalTheme}
+                        customStyle={{ background: 'transparent', padding: 0 }}
+                      >
+                        {response.sql}
+                      </SyntaxHighlighter>
+                    </div>
                   </div>
                 </div>
 
