@@ -8,8 +8,8 @@ const instrumentSans = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SQL Gen — Minimalist AI Query Generator",
-  description: "Convert natural language to SQL with precision and elegance.",
+  title: "SQL Generator",
+  description: "Convert natural language to SQL.",
 };
 
 export default function RootLayout({
