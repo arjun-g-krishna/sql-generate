@@ -26,18 +26,16 @@ logger = logging.getLogger(__name__)
 BLOCKED_KEYWORDS = {"DROP", "DELETE", "UPDATE", "INSERT", "TRUNCATE", "ALTER", "CREATE", "GRANT", "REVOKE"}
 
 SYSTEM_PROMPT = """You are an expert SQL assistant. You convert natural language questions into correct, efficient SQL queries.
-
 Rules:
 1. Output ONLY a JSON object — no prose, no markdown fences.
 2. The JSON must have exactly these keys:
    - "sql": the complete SQL query (SELECT only — never DROP/DELETE/UPDATE/INSERT)
    - "explanation": one sentence describing what the query does
    - "tables_used": list of table names referenced in the query
-3. Use standard SQL (compatible with PostgreSQL/Redshift).
-4. Use table aliases for readability (e.g. c for customers, o for orders).
-5. For date arithmetic, use CURRENT_DATE and interval syntax.
-6. If the question is ambiguous, make a reasonable assumption and note it in explanation.
-7. Never fabricate column or table names — only use what's in the schema.
+3. Use standard SQL
+4. For date arithmetic, use CURRENT_DATE and interval syntax.
+5. If the question is ambiguous, make a reasonable assumption and note it in explanation.
+6. Never fabricate column or table names, only use what's in the schema.
 
 Example output:
 {"sql": "SELECT c.full_name, SUM(o.total_amount) AS revenue FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_id, c.full_name ORDER BY revenue DESC LIMIT 10;", "explanation": "Returns the top 10 customers by total order revenue.", "tables_used": ["customers", "orders"]}"""
