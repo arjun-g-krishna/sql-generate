@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Database, ArrowRight, Clock, Code2, Table as TableIcon, ChevronDown, ChevronUp, Terminal } from "lucide-react";
+import { Search, Database, ArrowRight, Clock, Code2, Table as TableIcon, ChevronDown, ChevronUp, Terminal, Copy, Check } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 
 // Custom theme for SyntaxHighlighter to match our minimal look
@@ -51,6 +51,15 @@ export default function Home() {
   
   const [schemas, setSchemas] = useState<SchemaTable[]>([]);
   const [showSchemas, setShowSchemas] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (response?.sql) {
+      navigator.clipboard.writeText(response.sql);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     fetch("http://localhost:8000/schema")
@@ -177,7 +186,14 @@ export default function Home() {
                     <span>{response.latency_ms}ms</span>
                   </div>
                   
-                  <div className="bg-card border border-border rounded-xl p-6 shadow-sm font-mono text-sm overflow-x-auto">
+                  <div className="relative bg-card border border-border rounded-xl p-6 shadow-sm font-mono text-sm overflow-x-auto group">
+                    <button
+                      onClick={handleCopy}
+                      className="absolute top-4 right-4 p-2 rounded-md bg-transparent hover:bg-muted/10 text-muted hover:text-foreground transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      title="Copy SQL"
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
                     <SyntaxHighlighter
                       language="sql"
                       style={minimalTheme}
