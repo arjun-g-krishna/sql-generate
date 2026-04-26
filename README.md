@@ -1,6 +1,10 @@
+
 # SQL Generate
 
 **SQL Generate** allows users to query databases in plain English. Converts natural language questions into executable SQL queries using LLMs, with a fast FastAPI backend and a Next.js frontend.
+
+
+<img width="1388" height="720" alt="ezgif-83326aa33588f638" src="https://github.com/user-attachments/assets/2862594e-c4d2-4e90-b5b0-ec84ff770506" />
 
 ### Key Features
 - **Natural Language to SQL:** Write complex queries in plain English.
