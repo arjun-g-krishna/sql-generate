@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from app.models import QueryRequest, QueryResponse, SchemaInfo
-from app.sql_generator import SQLGenerator
+from app.sql_generator import SQLGenerator, UnsafeSQLValidationError
 from app.schema_store import SchemaStore
 
 logging.basicConfig(level=logging.INFO)
@@ -89,10 +89,14 @@ async def generate_sql(request: QueryRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    result = await app.state.generator.generate(
-        question=request.question,
-        top_k_tables=request.top_k_tables,
-    )
+    try:
+        result = await app.state.generator.generate(
+            question=request.question,
+            top_k_tables=request.top_k_tables,
+        )
+    except UnsafeSQLValidationError as exc:
+        # Invalid/unsafe generated SQL should be a client-visible validation error.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     result.latency_ms = round((time.perf_counter() - start) * 1000, 1)
     logger.info(

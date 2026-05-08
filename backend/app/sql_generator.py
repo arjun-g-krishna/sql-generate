@@ -14,6 +14,7 @@ import os
 import re
 import json
 import logging
+import unicodedata
 from typing import Optional
 
 import httpx
@@ -22,8 +23,31 @@ from app.schema_store import SchemaStore
 
 logger = logging.getLogger(__name__)
 
+
+class UnsafeSQLValidationError(Exception):
+    """Raised when generated SQL violates read-only safety policy."""
+
+
 # SQL statements that must never appear in generated queries
-BLOCKED_KEYWORDS = {"DROP", "DELETE", "UPDATE", "INSERT", "TRUNCATE", "ALTER", "CREATE", "GRANT", "REVOKE"}
+BLOCKED_KEYWORDS = {
+    "DROP",
+    "DELETE",
+    "UPDATE",
+    "INSERT",
+    "TRUNCATE",
+    "ALTER",
+    "CREATE",
+    "GRANT",
+    "REVOKE",
+    "MERGE",
+    "CALL",
+    "EXECUTE",
+    "VACUUM",
+    "ANALYZE",
+    "COPY",
+    "SET",
+    "RESET",
+}
 
 SYSTEM_PROMPT = """You are an expert SQL assistant. You convert natural language questions into correct, efficient SQL queries.
 Rules:
@@ -178,6 +202,7 @@ Respond with a JSON object only."""
             # The LLM sometimes returns a comma-separated string instead of a list
             tables_used = [t.strip() for t in tables_used.split(",")]
             
+        # Enforce hard safety validation; never return unsafe SQL.
         warning = self._safety_check(sql)
 
         return QueryResponse(
@@ -190,10 +215,67 @@ Respond with a JSON object only."""
 
     @staticmethod
     def _safety_check(sql: str) -> Optional[str]:
-        """Block any mutating SQL statements."""
-        upper = sql.upper()
+        """
+        Enforce strict read-only SQL validation.
+        Returns None when SQL is safe; otherwise raises UnsafeSQLValidationError.
+        """
+        normalized = SQLGenerator._normalize_sql(sql)
+        if not normalized:
+            raise UnsafeSQLValidationError("Generated SQL is empty.")
+
+        statement = SQLGenerator._remove_string_literals_and_comments(normalized)
+        statement = re.sub(r"\s+", " ", statement).strip()
+
+        if not statement:
+            raise UnsafeSQLValidationError("Generated SQL contains no executable statement.")
+
+        # Allow only one statement with optional trailing semicolon.
+        semicolons = statement.count(";")
+        if semicolons > 1 or (semicolons == 1 and not statement.endswith(";")):
+            raise UnsafeSQLValidationError("Only a single SQL statement is allowed.")
+
+        bare = statement.rstrip(";").strip()
+        if not bare:
+            raise UnsafeSQLValidationError("Generated SQL contains no executable statement.")
+
+        starts_with_read = bare.startswith("SELECT ") or bare.startswith("WITH ")
+        if not starts_with_read:
+            raise UnsafeSQLValidationError("Only read-only SELECT queries are allowed.")
+
+        if "SELECT" not in bare:
+            raise UnsafeSQLValidationError("Query must contain a SELECT clause.")
+
         for keyword in BLOCKED_KEYWORDS:
-            # Match as a whole word
-            if re.search(rf"\b{keyword}\b", upper):
-                return f"⚠️ Generated SQL contains blocked keyword '{keyword}' and was flagged. Review before executing."
+            # Match as a whole word after removing literals/comments.
+            if re.search(rf"\b{keyword}\b", bare):
+                raise UnsafeSQLValidationError(
+                    f"Blocked SQL operation detected ('{keyword}'). Only read-only queries are allowed."
+                )
+
+        # Block common write-intent punctuation outside literal/comment context.
+        if "\\" in bare:
+            raise UnsafeSQLValidationError("Backslash meta-commands are not allowed.")
+
         return None
+
+    @staticmethod
+    def _normalize_sql(sql: str) -> str:
+        """Normalize unicode and uppercase for robust policy matching."""
+        normalized = unicodedata.normalize("NFKC", sql)
+        return normalized.upper().strip()
+
+    @staticmethod
+    def _remove_string_literals_and_comments(sql: str) -> str:
+        """
+        Remove SQL string literals and comments to prevent keyword bypasses such as:
+        DROP /*x*/ TABLE, hidden content in '--', and quoted string tricks.
+        """
+        # Remove /* ... */ comments
+        without_block_comments = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+        # Remove -- ... end-of-line comments
+        without_line_comments = re.sub(r"--[^\n]*", " ", without_block_comments)
+        # Remove single-quoted string literals (including escaped '')
+        without_single_quotes = re.sub(r"'(?:''|[^'])*'", "''", without_line_comments)
+        # Remove double-quoted string literals/identifiers
+        without_double_quotes = re.sub(r'"(?:\\"|[^"])*"', '""', without_single_quotes)
+        return without_double_quotes
