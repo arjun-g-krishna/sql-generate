@@ -18,6 +18,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _get_allowed_origins() -> list[str]:
+    """
+    Read CORS origins from CORS_ALLOW_ORIGINS (comma-separated).
+    Falls back to local dev origins if not configured.
+    """
+    raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "")
+    parsed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+    if parsed_origins:
+        return parsed_origins
+
+    logger.warning(
+        "CORS_ALLOW_ORIGINS not set. Falling back to localhost-only CORS policy."
+    )
+    return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: load schema store
@@ -44,9 +60,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_get_allowed_origins(),
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
 
 
